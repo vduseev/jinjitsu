@@ -3,8 +3,9 @@
 Minimal Jinja CLI for rendering templates from files or stdin with variables, config files, and Python modules.
 Fast, predictable way to render Jinja2 templates from the terminal.
 
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/jinjitsu)
+![Version](https://img.shields.io/pypi/v/jinjitsu)
 ![PyPI - Status](https://img.shields.io/pypi/status/jinjitsu)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/jinjitsu)
 ![PyPI - License](https://img.shields.io/pypi/l/jinjitsu)
 
 [Installation](#installation) • [Quick Start](#quick-start) • [CLI](#cli) • [Examples](#examples) • [Troubleshooting](#troubleshooting) • [Contributing](#contributing) • [License](#license)
