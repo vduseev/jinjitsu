@@ -1,109 +1,73 @@
-# jinjitsu
+<h1><code>jinjitsu</code></h1>
 
-Minimal Jinja CLI for rendering templates from files or stdin with variables from CLI flags, config files, and Python modules. Built for people who want a fast, predictable way to render Jinja2 templates from the terminal.
+Minimal Jinja CLI for rendering templates from files or stdin with variables, config files, and Python modules.
+Fast, predictable way to render Jinja2 templates from the terminal.
 
-Installation • Quick Start • Examples • Docs • Troubleshooting • Contributing • License
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/jinjitsu)
+![PyPI - Status](https://img.shields.io/pypi/status/jinjitsu)
+![PyPI - License](https://img.shields.io/pypi/l/jinjitsu)
 
-## Why jinjitsu?
-
-- Render Jinja from the CLI: point at a file or use `--stdin`.
-- Combine variables from multiple sources with clear precedence: `--module` → `--vars` → `-D` (last wins).
-- “Smart” autoescape by extension for HTML/XML; off for plain text unless hinted.
-- Includes/imports that just work via `--searchpath` directories.
-- Control whitespace and newlines (`--trim-blocks`, `--lstrip-blocks`, `--newline-sequence`).
-- Helpful errors and non‑zero exit codes; show `--traceback` when you need it.
-
-## Compatibility
-
-- Runtime: Python `>=3.13`.
-- OS: Linux, macOS, Windows (anywhere Python runs).
-- Dependencies: `jinja2>=3.1.6`.
-- Optional: YAML (`PyYAML` or `ruamel.yaml`), TOML (`tomllib` on 3.11+, else `tomli`/`toml`).
-
-## Installation
-
-One‑liner (local clone or checkout):
-
-```bash
-pipx install .
-```
-
-Notes
-- If you prefer a virtualenv: `python -m venv .venv && . .venv/bin/activate && pip install -e .`.
-- When published to a registry, use: `pipx install jinjitsu` or `pip install -U jinjitsu`.
+[Installation](#installation) • [Quick Start](#quick-start) • [CLI](#cli) • [Examples](#examples) • [Troubleshooting](#troubleshooting) • [Contributing](#contributing) • [License](#license)
 
 ## Quick Start
 
-Hello world from stdin:
+* Hello world:
 
-```bash
-echo "Hello {{ name }}" | jinjitsu --stdin -D name=World
-```
+  ```shell
+  $ echo "Hello {{ name }}" | jinjitsu --stdin -D name=World
+  Hello World
+  ```
 
-Expected output:
+* Render a template with includes from a different directory
 
-```
-Hello World
-```
+  `docs/README.j2.md`:
 
-Autoescape by output extension (HTML):
+  ````markdown
+  # Dynamically rendered README
 
-```bash
-echo "{{ name }}" | jinjitsu --stdin -D name='<World>' -o out.html && cat out.html
-```
+  ```ts
+  {% include 'code.ts' %}
+  ```
+   ````
 
-Expected output:
+  `examples/code.ts`:
 
-```
-&lt;World&gt;
-```
+  ```ts
+  export const greeting = "Hello, User";
+  ```
 
-## Examples
+  Now, **rendering it** with `jinjitsu` and adding `examples` as
+  a `--searchpath` will produce the following **result**:
 
-Render a file with variables from a Python module, a vars file, and the CLI; also set an include path:
+  ````
+  $ jinjitsu docs/README.j2.md -s examples/
+  # Dynamically rendered README
 
-```bash
-# extras.py exports variables (functions/values); all top‑level names are exposed
-cat > extras.py <<'PY'
-def greet(who):
-    return f"hi, {who}!"
-_private = "visible"
-PY
+  ```ts
+  export const greeting = "Hello, User";
+  ```
+  ````
 
-# vars.json provides additional context
-echo '{"from_file": "file"}' > vars.json
+  Or render it directly to a file by redirecting `>` the output or using the `-o` option:
 
-# includes/partial.txt will be used via {% include %}
-mkdir -p includes && echo 'partial={{ extra }}' > includes/partial.txt
+  ```shell
+  # Like so
+  $ jinjitsu docs/README.j2.md -s examples/ -o README.md
 
-cat > template.txt <<'J2'
-module={{ greet('world') }}
-file={{ from_file }}
-private={{ _private }}
-{% include 'partial.txt' %}
-J2
+  # Or like so
+  $ jinjitsu docs/README.j2.md -s examples/ > README.md
+  ```
 
-jinjitsu template.txt \
-  --module extras.py \
-  --vars vars.json \
-  -D extra=EX \
-  --searchpath includes
-```
+* Autoescape HTML and feed template as a Heredoc (`<<EOF`)
 
-Expected output:
+  ```shell
+  $ jinjitsu --stdin -D name='<World>' --autoescape on <<EOF        
+  Hello {{ name }}
+  EOF
+  Hello &lt;World&gt;
+  ```
 
-```
-module=hi, world!
-file=file
-private=visible
-partial=EX
-```
-
-More real‑world scenarios live in tests and design docs:
-- tests: `tests/test_cli.py`
-- docs: `docs/design/2025-09-23-jinjitsu-cli.md`
-
-## CLI Overview
+## CLI
 
 ```text
 Usage: jinjitsu [OPTIONS] [TEMPLATE]
@@ -134,13 +98,96 @@ Output and diagnostics
   --traceback               Show full Python tracebacks on errors.
 ```
 
+## Installation
+
+Run using `uv` without needing to install anything:
+
+```shell
+uvx jinjitsu
+```
+
+Or install as a system-wide tool:
+
+```shell
+# Using uv
+uv tool install jinjitsu
+
+# Using pipx
+pipx install jinjitsu
+```
+
+Of course, you can also install as a package in the current virtual environment:
+
+```shell
+./.venv/bin/activate && pip install jinjitsu
+```
+
+## Examples
+
+Let's consider an example with dynamically generated release notes.
+We want to render a template that uses a function from a Python module,
+includes a reusable sub-template, and uses variables from a vars file and the CLI.
+
+```bash
+# First, let's create a Python module with a two functions and a private variable
+$ cat > extras.py <<'PY'
+from datetime import datetime
+
+def greet(name: str) -> str:
+    """Greet someone."""
+    return f"Greetings, {name}!"
+
+def today() -> str:
+    """Return today's date."""
+    return datetime.now().strftime('%Y-%m-%d')
+
+_private_variable = "visible"
+PY
+
+# Then, we create a vars.json file with additional variables
+$ echo '{ "changelog": "CHANGELOG.md" }' > vars.json
+
+# Let's also create a reusable template in the "shared" directory
+$ mkdir -p shared && echo 'Release type: {{ type }}' > shared/type.j2
+
+# Finally, let's define the main template
+$ cat > deployment_summary.j2 <<'J2'
+Deployment summary {{ today() }}
+
+* {% include 'type.j2' %}
+* Changelog: {{ changelog }}
+* Status: {{ _private_variable }}
+J2
+
+# Now, render the template with jinjitsu
+$ jinjitsu deployment_summary.j2 \
+  --module extras.py \
+  --vars vars.json \
+  -D type=PROD \
+  --searchpath shared
+```
+
+Expected output:
+
+```
+Deployment summary 2023-04-10
+
+* Release type: PROD
+* Changelog: CHANGELOG.md
+* Status: visible
+```
+
 ## Configuration & Notes
 
-- Precedence: later sources override earlier ones → modules < `--vars` files < `-D/--var`.
-- `--stdin` infers autoescape from `--output` extension when provided; otherwise renders as plain text.
-- Include/import search order: template’s directory (for file templates) followed by each `--searchpath` in order; for `--stdin`, falls back to the current working directory if no paths given.
+* Variable precedence:
+  * Later sources override earlier ones
+  * `-D/--var` flags override `--vars` files, which override `-m/--modules`.
+* Include/import search order:
+  * template’s directory;
+  * for `--stdin`, falls back to the current working directory;
+  * always adds all provided `-s/--searchpath` directories to the above.
 
-## Troubleshooting / FAQ
+## Troubleshooting
 
 - “YAML file not supported” or similar
   - Install a YAML parser: `pip install PyYAML` (or `ruamel.yaml`).
@@ -160,27 +207,9 @@ Output and diagnostics
 - I need a Python traceback
   - Add `--traceback` for full tracebacks on errors.
 
-## Roadmap / Status
-
-- Version: `0.1.0` (early stage, minimal scope). Future ideas include Jinja extensions toggles and additional CLI switches as demand emerges.
-
 ## Contributing
 
 Pull requests and issues are welcome.
-
-Developer setup
-
-```bash
-python -m venv .venv && . .venv/bin/activate
-pip install -e . pytest ruff ty
-pytest -q
-ruff check .
-```
-
-## Security
-
-- jinjitsu does not sandbox templates. Do not render untrusted templates or modules.
-- Report security issues privately to the maintainer: `vagiz@duseev.com`.
 
 ## License
 
