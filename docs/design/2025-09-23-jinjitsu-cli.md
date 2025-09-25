@@ -194,9 +194,3 @@ Notes
 - Custom delimiters flags (block/variable/comment start/end).
 - Bytecode cache (`--bytecode-cache DIR`).
 - `--fail-missing-includes`.
-
-## Unknowns / Questions
-
-1. Include search path defaults for `--stdin`: current design uses `cwd` plus any `--searchpath`. OK?
-
-Please review and I will iterate.
